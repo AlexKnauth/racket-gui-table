@@ -11,8 +11,8 @@
        [content
         (for/list ([i (in-range 5)])
           (for/list ([j (in-range 5)])
-            (cond [(even? (+ i j)) (format "i: ~v, j: ~v" i j)]
-                  [else (λ (parent)
-                          (new button% [parent parent] [label "hi!"]
-                               [callback (λ (x y) (displayln "hi!"))]))])))]
+            (λ (parent)
+              (cond [(even? (+ i j)) (format "i: ~v, j: ~v" i j)]
+                    [else (new button% [parent parent] [label "hi!"]
+                               [callback (λ (x y) (displayln "hi!"))])]))))]
        ))

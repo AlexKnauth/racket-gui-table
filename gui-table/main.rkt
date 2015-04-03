@@ -5,13 +5,25 @@
 (require racket/gui/base)
 
 ;; cell-content means one of:
-;;  - (λ (parent) gui-object)
+;;  - (λ (parent) (U gui-object cell-content))
 ;;  - String
 
 (define (cell-content-proc content)
-  (cond [(procedure? content) content]
-        [(string? content) (λ (parent) (string->message content #:parent parent))]
-        [else (error '->cell-content-proc "expected (or/c procedure? string?), given: ~v" content)]))
+  (cond [(or (procedure? content) (string? content))
+         (define (content-proc parent)
+           (cell-content->obj content #:parent parent))
+         content-proc]
+        [else (error 'cell-content-proc "expected (or/c procedure? string?), given: ~v" content)]))
+
+(define (cell-content->obj content #:parent parent)
+  (cond [(object? content)
+         (unless (object=? (send content get-parent) parent)
+           (error 'cell-content->obj "parent doesn't match"))
+         content]
+        [(procedure? content) (cell-content->obj (content parent) #:parent parent)]
+        [(string? content) (string->message content #:parent parent)]
+        [else
+         (error 'cell-content->obj "expected (or/c object? procedure? string?), given: ~v" content)]))
 
 (define table%
   (class vertical-panel%
