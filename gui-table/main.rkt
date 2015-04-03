@@ -1,8 +1,17 @@
 #lang racket
 
-(provide table% null-panel)
+(provide table%)
 
 (require racket/gui/base)
+
+;; cell-content means one of:
+;;  - (λ (parent) gui-object)
+;;  - String
+
+(define (cell-content-proc content)
+  (cond [(procedure? content) content]
+        [(string? content) (λ (parent) (string->message content #:parent parent))]
+        [else (error '->cell-content-proc "expected (or/c procedure? string?), given: ~v" content)]))
 
 (define table%
   (class vertical-panel%
@@ -11,7 +20,7 @@
           [cell-alignment '(center center)]
           [min-column-width 0]
           [min-row-height   0]
-          [text-fields? #f])
+          )
     
     (super-new [style style])
     
@@ -19,18 +28,10 @@
                                   [parent this]
                                   [style style]))
     
-    (field [rows
-            (local [(define (any->object x)
-                      (cond [(object? x) x]
-                            [(string? x)
-                             (cond [text-fields?
-                                    (string->text-field x #:parent null-panel)]
-                                   [else
-                                    (string->message x #:parent null-panel)])]
-                            [else (any->object (~v x))]))]
-              (for/list ([row (in-list content)])
-                (for/list ([cell-content row])
-                  (any->object cell-content))))])
+    (define proc-rows
+      (for/list ([row (in-list content)])
+        (for/list ([content row])
+          (cell-content-proc content))))
     
     (define/public (change-column-panels filter-proc)
       (send* horizontal-panel (change-children filter-proc)))
@@ -50,41 +51,38 @@
     (define (columns->rows columns)
       (apply map list columns))
     
-    (define columns (rows->columns rows))
+    (define proc-columns (rows->columns proc-rows))
     
     (define/public (change-row-lists filter-proc)
       (change-column-lists (compose1 rows->columns filter-proc columns->rows)))
     
-    (for ([column (in-list columns)])
-      (define column-panel (new vertical-panel% [parent horizontal-panel] [min-width min-column-width]))
-      (for ([cell-content (in-list column)]
-            [row-num (in-naturals)])
-        (local [(define current-row (list-ref rows row-num))
-                (define row-height
-                  (apply max min-row-height
-                         (for/list ([cell-content_0 (in-list current-row)])
-                           (send cell-content_0 min-height))))
-                (define cell-panel (new vertical-panel%
-                                        [parent column-panel]
-                                        [style '(border)]
-                                        [alignment cell-alignment]
-                                        [stretchable-height #f]))]
-          (send* cell-content
-            (reparent cell-panel)
-            (min-height row-height)))))
+    (define obj-columns
+      (for/list ([proc-column (in-list proc-columns)])
+        (define column-panel (new vertical-panel% [parent horizontal-panel] [min-width min-column-width]))
+        (define obj-column
+          (for/list ([content-proc (in-list proc-column)]
+                     [row-num (in-naturals)])
+            (define current-proc-row (list-ref proc-rows row-num))
+            (define cell-panel (new vertical-panel%
+                                    [parent column-panel]
+                                    [style '(border)]
+                                    [alignment cell-alignment]
+                                    [stretchable-height #f]))
+            (define obj-cell (content-proc cell-panel))
+            obj-cell))
+        obj-column))
+    (define obj-rows (columns->rows obj-columns))
+    (for ([obj-row (in-list obj-rows)])
+      (define row-height
+        (apply max min-row-height
+               (for/list ([obj-cell (in-list obj-row)])
+                 (send obj-cell min-height))))
+      (for ([cell (in-list obj-row)])
+        (send cell min-height row-height)))
     ))
-
-(define (string->text-field s #:parent parent #:label [label #f])
-  (new text-field%
-       [init-value s]
-       [parent parent]
-       [label label]))
 
 (define (string->message s #:parent parent)
   (new message%
        [label s]
        [parent parent]))
-
-(define null-frame (new frame% [label "null-frame"] [width 100] [height 100]))
-(define null-panel (new panel% [parent null-frame]))
 
