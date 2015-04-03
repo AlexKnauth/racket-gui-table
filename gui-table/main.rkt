@@ -91,6 +91,9 @@
                  (send obj-cell min-height))))
       (for ([cell (in-list obj-row)])
         (send cell min-height row-height)))
+
+    (define/public (get-rows) obj-rows)
+    (define/public (get-columns) obj-columns)
     ))
 
 (define (string->message s #:parent parent)
