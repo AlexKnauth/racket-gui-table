@@ -4,3 +4,5 @@
 
 (define deps '("base" "gui-lib"))
 
+(define build-deps '("scribble-lib"))
+

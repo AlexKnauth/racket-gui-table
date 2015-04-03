@@ -1,29 +1,37 @@
 #lang racket
 
-(provide table%)
+(provide table% cell-content/c panel? area?)
 
 (require racket/gui/base)
 
 ;; cell-content means one of:
 ;;  - (λ (parent) (U gui-object cell-content))
 ;;  - String
+(define cell-content/c
+  (recursive-contract
+   (or/c [panel? . -> . (or/c area? cell-content/c)]
+         string?)
+   #:chaperone))
+
+(define panel? (is-a?/c panel%))
+(define area? (is-a?/c area<%>))
 
 (define (cell-content-proc content)
-  (cond [(or (procedure? content) (string? content))
+  (cond [(or ((procedure-arity-includes/c 1) content) (string? content))
          (define (content-proc parent)
            (cell-content->obj content #:parent parent))
          content-proc]
-        [else (error 'cell-content-proc "expected (or/c procedure? string?), given: ~v" content)]))
+        [else (error 'cell-content-proc "expected cell-content/c, given: ~v" content)]))
 
 (define (cell-content->obj content #:parent parent)
-  (cond [(object? content)
+  (cond [(area? content)
          (unless (object=? (send content get-parent) parent)
            (error 'cell-content->obj "parent doesn't match"))
          content]
-        [(procedure? content) (cell-content->obj (content parent) #:parent parent)]
+        [((procedure-arity-includes/c 1) content) (cell-content->obj (content parent) #:parent parent)]
         [(string? content) (string->message content #:parent parent)]
         [else
-         (error 'cell-content->obj "expected (or/c object? procedure? string?), given: ~v" content)]))
+         (error 'cell-content->obj "expected (or/c area? cell-content/c), given: ~v" content)]))
 
 (define table%
   (class vertical-panel%
@@ -72,23 +80,21 @@
       (for/list ([proc-column (in-list proc-columns)])
         (define column-panel (new vertical-panel% [parent horizontal-panel] [min-width min-column-width]))
         (define obj-column
-          (for/list ([content-proc (in-list proc-column)]
-                     [row-num (in-naturals)])
-            (define current-proc-row (list-ref proc-rows row-num))
+          (for/list ([content-proc (in-list proc-column)])
             (define cell-panel (new vertical-panel%
                                     [parent column-panel]
                                     [style '(border)]
                                     [alignment cell-alignment]
                                     [stretchable-height #f]))
-            (define obj-cell (content-proc cell-panel))
-            obj-cell))
+            (define cell (content-proc cell-panel))
+            cell))
         obj-column))
     (define obj-rows (columns->rows obj-columns))
     (for ([obj-row (in-list obj-rows)])
       (define row-height
         (apply max min-row-height
-               (for/list ([obj-cell (in-list obj-row)])
-                 (send obj-cell min-height))))
+               (for/list ([cell (in-list obj-row)])
+                 (send cell min-height))))
       (for ([cell (in-list obj-row)])
         (send cell min-height row-height)))
 
