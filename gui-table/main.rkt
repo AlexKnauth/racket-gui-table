@@ -52,24 +52,13 @@
       (cell-content-rows->proc-rows content))
     
     (define/public (get-columns)
-      (let ([column-panels (send horizontal-panel get-children)])
-        (for/list ([column (in-list column-panels)])
-          (send column get-children))))
+      (for/list ([column-panel (in-list (send horizontal-panel get-children))])
+        (for/list ([cell-panel (in-list (send column-panel get-children))])
+          (match-define (list cell) (send cell-panel get-children))
+          cell)))
     
     (define/public (get-rows)
       (columns->rows (get-columns)))
-    
-    (define/public (change-column-lists filter-proc)
-      (let* ([column-panels (send horizontal-panel get-children)]
-             [column-lists (for/list ([column (in-list column-panels)])
-                             (send column get-children))]
-             [new-column-lists (filter-proc column-lists)])
-        (for ([column-panel (in-list column-panels)]
-              [column-list  (in-list new-column-lists)])
-          (send* column-panel (change-children (lambda (children) column-list))))))
-    
-    (define/public (change-row-lists filter-proc)
-      (change-column-lists (compose1 rows->columns filter-proc columns->rows)))
     
     (define obj-columns
       (for/list ([proc-column (in-list (rows->columns proc-rows))])
