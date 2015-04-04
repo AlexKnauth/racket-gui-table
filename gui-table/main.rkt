@@ -49,12 +49,15 @@
                                   [style style]))
     
     (define proc-rows
-      (for/list ([row (in-list content)])
-        (for/list ([content row])
-          (cell-content-proc content))))
+      (cell-content-rows->proc-rows content))
     
-    (define/public (change-column-panels filter-proc)
-      (send* horizontal-panel (change-children filter-proc)))
+    (define/public (get-columns)
+      (let ([column-panels (send horizontal-panel get-children)])
+        (for/list ([column (in-list column-panels)])
+          (send column get-children))))
+    
+    (define/public (get-rows)
+      (columns->rows (get-columns)))
     
     (define/public (change-column-lists filter-proc)
       (let* ([column-panels (send horizontal-panel get-children)]
@@ -65,19 +68,11 @@
               [column-list  (in-list new-column-lists)])
           (send* column-panel (change-children (lambda (children) column-list))))))
     
-    (define (rows->columns rows)
-      (apply map list rows))
-    
-    (define (columns->rows columns)
-      (apply map list columns))
-    
-    (define proc-columns (rows->columns proc-rows))
-    
     (define/public (change-row-lists filter-proc)
       (change-column-lists (compose1 rows->columns filter-proc columns->rows)))
     
     (define obj-columns
-      (for/list ([proc-column (in-list proc-columns)])
+      (for/list ([proc-column (in-list (rows->columns proc-rows))])
         (define column-panel (new vertical-panel% [parent horizontal-panel] [min-width min-column-width]))
         (define obj-column
           (for/list ([content-proc (in-list proc-column)])
@@ -89,8 +84,8 @@
             (define cell (content-proc cell-panel))
             cell))
         obj-column))
-    (define obj-rows (columns->rows obj-columns))
-    (for ([obj-row (in-list obj-rows)])
+
+    (for ([obj-row (in-list (columns->rows obj-columns))])
       (define row-height
         (apply max min-row-height
                (for/list ([cell (in-list obj-row)])
@@ -98,9 +93,20 @@
       (for ([cell (in-list obj-row)])
         (send cell min-height row-height)))
 
-    (define/public (get-rows) obj-rows)
-    (define/public (get-columns) obj-columns)
     ))
+
+
+(define (rows->columns rows)
+  (apply map list rows))
+
+(define (columns->rows columns)
+  (apply map list columns))
+
+(define (cell-content-rows->proc-rows content)
+  (for/list ([row (in-list content)])
+    (for/list ([content (in-list row)])
+      (cell-content-proc content))))
+
 
 (define (string->message s #:parent parent)
   (new message%
